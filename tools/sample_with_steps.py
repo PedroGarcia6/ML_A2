@@ -3,21 +3,22 @@ import torchvision
 import argparse
 import yaml
 import os
-from torchvision.utils import make_grid
+from torchvision.utils import save_image
 from tqdm import tqdm
 from models.unet_base import Unet
 from scheduler.linear_noise_scheduler import LinearNoiseScheduler
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def sample_with_steps(model, scheduler, train_config, model_config, diffusion_config, num_images, output_dir):
-    xt = torch.randn((train_config['num_samples'],
+def sample_with_steps(model, scheduler, train_config, model_config, diffusion_config, num_images, output_dir, output_file):
+    xt = torch.randn((1,  # Only one sample
                       model_config['im_channels'],
                       model_config['im_size'],
                       model_config['im_size'])).to(device)
     
-    steps_interval = diffusion_config['num_timesteps'] // num_images
-    save_steps = range(0, diffusion_config['num_timesteps'], steps_interval)
+    timesteps = list(range(diffusion_config['num_timesteps']))
+    save_steps = [timesteps[i * (diffusion_config['num_timesteps'] // (num_images - 1))] for i in range(num_images - 1)]
+    save_steps.append(timesteps[-1])  # Ensure the last step is included
     os.makedirs(output_dir, exist_ok=True)
     
     for i in tqdm(reversed(range(diffusion_config['num_timesteps']))):
@@ -25,11 +26,9 @@ def sample_with_steps(model, scheduler, train_config, model_config, diffusion_co
         xt, x0_pred = scheduler.sample_prev_timestep(xt, noise_pred, torch.as_tensor(i).to(device))
         
         if i in save_steps:
-            ims = torch.clamp(xt, -1., 1.).detach().cpu()
+            ims = torch.clamp(x0_pred, -1., 1.).detach().cpu()
             ims = (ims + 1) / 2
-            img = torchvision.transforms.ToPILImage()(ims.squeeze(0))
-            img.save(os.path.join(output_dir, f'x0_step_{i}.png'))
-            img.close()
+            save_image(ims, os.path.join(output_dir, f'{output_file}_step_{i}.png'))
 
 def main(args):
     with open(args.config_path, 'r') as file:
@@ -55,13 +54,14 @@ def main(args):
     
     os.makedirs(args.output_dir, exist_ok=True)
     with torch.no_grad():
-        sample_with_steps(model, scheduler, train_config, model_config, diffusion_config, args.num_images, args.output_dir)
+        sample_with_steps(model, scheduler, train_config, model_config, diffusion_config, args.num_images, args.output_dir, args.output_file)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sample images with steps for DDPM')
     parser.add_argument('--config', dest='config_path', default='config/default.yaml', type=str)
     parser.add_argument('--num_images', type=int, default=10, help='Number of intermediate images to save')
     parser.add_argument('--output_dir', type=str, default='mysample', help='Directory to save the output images')
+    parser.add_argument('--output_file', type=str, default='x0', help='Base name for the output image files')
     args = parser.parse_args()
     main(args)
 
