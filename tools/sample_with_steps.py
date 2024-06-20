@@ -27,8 +27,7 @@ def sample_with_steps(model, scheduler, train_config, model_config, diffusion_co
         if i in save_steps:
             ims = torch.clamp(xt, -1., 1.).detach().cpu()
             ims = (ims + 1) / 2
-            grid = make_grid(ims, nrow=train_config['num_grid_rows'])
-            img = torchvision.transforms.ToPILImage()(grid)
+            img = torchvision.transforms.ToPILImage()(ims.squeeze(0))
             img.save(os.path.join(output_dir, f'x0_step_{i}.png'))
             img.close()
 
@@ -53,6 +52,8 @@ def main(args):
     scheduler = LinearNoiseScheduler(num_timesteps=diffusion_config['num_timesteps'],
                                      beta_start=diffusion_config['beta_start'],
                                      beta_end=diffusion_config['beta_end'])
+    
+    os.makedirs(args.output_dir, exist_ok=True)
     with torch.no_grad():
         sample_with_steps(model, scheduler, train_config, model_config, diffusion_config, args.num_images, args.output_dir)
 
@@ -63,3 +64,4 @@ if __name__ == '__main__':
     parser.add_argument('--output_dir', type=str, default='mysample', help='Directory to save the output images')
     args = parser.parse_args()
     main(args)
+
