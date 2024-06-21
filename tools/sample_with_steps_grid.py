@@ -11,7 +11,7 @@ from scheduler.linear_noise_scheduler import LinearNoiseScheduler
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def sample_with_steps(model, scheduler, train_config, model_config, diffusion_config, num_images, output_dir):
-    xt = torch.randn((1,
+    xt = torch.randn((9,
                       model_config['im_channels'],
                       model_config['im_size'],
                       model_config['im_size'])).to(device)
@@ -29,7 +29,7 @@ def sample_with_steps(model, scheduler, train_config, model_config, diffusion_co
         if i in save_steps:
             ims = torch.clamp(xt, -1., 1.).detach().cpu()
             ims = (ims + 1) / 2
-            grid = make_grid(ims, nrow=1)
+            grid = make_grid(ims, nrow=3)
             img = torchvision.transforms.ToPILImage()(grid)
             img.save(os.path.join(output_dir, f'x0_step_{i}.png'))
             img.close()
